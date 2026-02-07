@@ -1,0 +1,259 @@
+---
+title: "Project 2 Report: Natural disaster"
+subtitle: "University of Sydney | DATA1901 | Oct 2024"
+author: "SID 540786875"
+format: 
+  html:
+    embed-resources: true
+    toc: true
+    code-fold: true
+    code-block-border-left: true
+    code-block-bg: true
+    title-block-banner: true
+    theme: "flatly"
+---
+
+# Client Bio and Recommendation
+
+**Client**: 
+
+![](niels.jpg){fig-align="center" width="278"}
+
+**Niels Holm-Nielsen** - *Head of the Global Facility for Disaster Reduction and Recovery (GFDRR)*. ([LinkedIn](https://www.linkedin.com/in/niels-holm-nielsen-3203682/)\|[Website](https://www.gfdrr.org/en))
+
+GFDRR, administered by the World Bank Group, supports low-income countries on disaster risk mitigation. Since 2015, GFDRR has mobilized around $35 billion in financing for disaster and climate resilience operations worldwide, making a significant impact on reducing vulnerability to natural hazards.
+
+Holm-Nielsen joined the World Bank in 2006 and has held key positions in Disaster Risk Management across regions such as Latin America, the Caribbean, and Africa, most recently serving as Lead Disaster Risk Management Specialist and Global Lead for Resilience and Disaster Risk Management.
+
+**Recommendation**: 
+
+Holm-Nielsen should significantly **increase funding** for **disaster risk reduction** in **Southern and Eastern Asia**. Regression analysis suggests that **increased prevention efforts can help reduce economic losses**.  Prioritizing resource allocation to countries such as **Nepal, Vietnam, Cambodia, Thailand, Pakistan, and the Philippines** will be a **strategic investment** in sustainable development, strengthening economic resilience in the region.
+
+# Evidence
+
+The analysis focuses on three variables: 
+
+-   **Number of people affected by disasters per 100,000** and **Total economic damages from disasters as a share of GDP** from the Natural Disaster data. 
+-   **Risk reduction progress score** from Gapminder’s Natural risk reduction progress score data.
+
+```{r, warning = FALSE, message = FALSE}
+# Load libraries
+library(tidyverse)
+library(ggplot2)
+library(plotly)
+library(maps)
+library(viridis)
+library(rnaturalearth)
+library(rnaturalearthdata)
+
+# Read and clean datasets
+disaster_data <- read.csv("natural-disasters.csv")
+
+disaster_data <- disaster_data %>% 
+  rename(EconDmgShare = Total.economic.damages.from.disasters.as.a.share.of.GDP, 
+         HumanDmgPer = Number.of.people.affected.by.disasters.per.100.000) %>%
+  filter(!is.na(EconDmgShare),
+         !is.na(HumanDmgPer),
+         !Entity %in% c("High income", "Low income", "Lower middle income", "Upper middle income", "World"),
+         Year >= 1960) %>%
+  select(Entity, Year, EconDmgShare, HumanDmgPer)
+
+score_data <- read.csv("risk-reduction-score.csv")
+
+score_data <- score_data %>% 
+  rename(RiskReductionScore = X2011)
+```
+
+## I. Human and Economic Vulnerability in Asia
+
+::: panel-tabset
+## Human
+```{r, warning = FALSE, message = FALSE}
+regions_list <- c("Africa", "Asia", "North America", "South America", "Europe", "Oceania")
+
+regional_data <- disaster_data %>%
+  filter(Entity %in% regions_list)
+
+regional_impact <- regional_data %>% 
+  group_by(Entity) %>%
+  summarise(across(c(`EconDmgShare`, `HumanDmgPer`), sum, na.rm = TRUE))
+
+plot1 <- ggplot(regional_impact, aes(x = Entity, y = `HumanDmgPer`, fill = Entity)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.75) +
+  labs(title = "Regional Sociological Impact of Natural Disasters (1960 - 2010)", y = "People affected per 100,000", x = "Region") +
+  theme_minimal() +
+  scale_fill_viridis_d(option = "mako") +
+  theme(legend.position = "none")
+
+ggplotly(plot1)
+```
+## Economy
+```{r}
+
+plot2 <- ggplot(regional_impact, aes(x = Entity, y = `EconDmgShare`, fill = Entity)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.75) +
+  labs(title = "Regional Economic Damage of Natural Disasters (1960 - 2010)", y = "Economic damage as a share of GDP (%)", x = "Region") +
+  theme_minimal() + 
+  scale_fill_viridis_d(option = "mako") +
+  theme(legend.position = "none")
+
+
+ggplotly(plot2)
+```
+:::
+
+The bar plots reveal a high disparity in human damage between Asia and the rest of the world. While ranking second to Oceania in economic damage, it is also significant, highlighting Asia's overwhelming vulnerability to natural disaster and need of damage mitigation and recovery support.
+
+## II. High-Risk Zones in Southern and Eastern Asia
+
+```{r, warning = FALSE, message = FALSE}
+# Filter data
+dmg2010_data <- disaster_data %>%
+  filter(Year == 2010, 
+         !is.na(EconDmgShare)) %>%
+  select(Entity, EconDmgShare)
+
+map_data <- ne_countries(scale = "medium", returnclass = "sf", continent = "asia")
+
+# Merge the cleaned disaster data with the world map data
+map_data <- map_data %>%
+  left_join(dmg2010_data, by = c("name" = "Entity"))
+
+# Map
+my_map <- ggplot(data = map_data) +
+  geom_sf(lwd = 0.2, 
+          aes(fill = EconDmgShare,
+              text = paste("Country:", name, "<br>Economic Damage:", round(EconDmgShare, 2)))) +
+  scale_fill_viridis(option = "viridis", 
+                     na.value = "grey50", 
+                     breaks = seq(0, 2.402, by = 0.4)) +
+  labs(title = "Total Economic Damages from Disasters as a Share of GDP by Country in 2010",
+       fill = "Economic\nDmg (%)",
+       x = "Longitude", 
+       y = "Latitude") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5))
+
+ggplotly(my_map, tooltip = "text")
+```
+
+The interactive map, visualizing economic damage across Asian countries, indicates that GFDRR should prioritize resources for countries such as Nepal, Vietnam, Cambodia, Thailand, Pakistan, and the Philippines. This aligns with findings from the ASEAN Disaster Risk Management Initiative (UNDRR 2010), which identifies Southeast Asia as one of the most disaster-prone regions in the world. Given that all these countries are located in Southern and Eastern Asia, there is a strong case for focusing disaster mitigation effort in this vulnerable area.
+
+## III. The Case for Investing in Resilience
+
+```{r, warning = FALSE, message = FALSE}
+sea_countries_list <- c("Bangladesh", "Brunei", "Cambodia", "China", "Fiji", "India", "Indonesia", "Japan", "Kiribati", "Laos", "Malaysia", "Myanmar", "Nepal", "North Korea", "Pakistan", "Palau", "Philippines", "Singapore", "South Korea", "Sri Lanka", "Thailand", "Timor", "Tuvalu", "Vietnam")
+
+# Join with score data and filter
+final_data <- score_data %>%
+  left_join(dmg2010_data, by = c("country" = "Entity")) %>%
+  filter(country %in% sea_countries_list) %>%
+  na.omit()
+
+plot3 <- ggplot(final_data, aes(x = EconDmgShare, y = RiskReductionScore)) +
+  geom_point(aes(text = paste("Country: ", country, 
+                              "<br>Score: ", RiskReductionScore, 
+                              "<br>Economic Damage: ", round(EconDmgShare, 2)))) +
+  geom_smooth(method = "lm", se = FALSE, color = "#42f5b3") +
+  labs(x = "Economic Damage as a share of GDP (2010)",
+       y = "Risk Reduction Progress Score (2009 - 2011)",
+       title = "Correlation between Risk Reduction Progress Score and Economic Damage") +
+  theme_minimal()
+
+ggplotly(plot3, tooltip = "text")
+
+correlation <- round(cor(final_data$RiskReductionScore, final_data$EconDmgShare), 2)
+print(paste("Correlation: ", correlation))
+```
+
+The disaster risk reduction progress score is based on self-assessment scores submitted by countries under the Hyogo Framework (UNDRR) from 2009 to 2011, ranging from 1 to 5. The regression model indicates a moderate negative correlation between economic damage as a share of GDP in 2010 and the score for Southern and Eastern Asian countries. In line with the findings of the Asian Development Bank, which states that effective disaster risk reduction can yield $4–$7 in savings for every dollar invested, supporting the argument for GFDRR to increase funding in these regions
+
+## IV. Hypothesis Testing
+
+To determine if economic damages of countries in the Southern and Eastern Asia area is significantly higher than the rest of Asia, a proportion test is utilized.
+
+-   *p*-value = 0.02243 \< 0.05
+
+The p-value falls below the threshold of 0.05, supporting the conclusion that a greater number of countries in Southern and Eastern Asia experience substantial economic damage.
+
+
+# Appendix
+
+::: panel-tabset
+## Client choice
+
+Niels Holm-Nielsen is a solid choice due to his leading position at GFDRR and extensive experience in disaster risk management. Since 2015, GFDRR has mobilized about $35 billion for disaster and climate resilience initiatives. Holm-Nielsen's leadership has been crucial to this important work of reducing vulnerability to natural disasters. This report provides Holm-Nielsen with insight on which region the organization should focus on, and how enhancing risk mitigation might benefit a country's economic growth.
+
+## Hypothesis testing
+### 1. Hypotheses
+
+Since around half of Asian countries are in the Southern and Eastern Asia, we expect half of the countries that experienced high economic damage (>0.5% of GDP) to be in the region.
+
+*H~0~:* **50%** of Asian countries that experienced high economic damage from natural disaster are from Southern and Eastern Asia.
+
+*H~1~:* **More than 50%** of Asian countries that experienced high economic damage from natural disaster are from Southern and Eastern Asia.
+
+### 2. Assumptions
+
+-   **Database Accuracy:** All countries’ statistics are correct.
+-   **Independence:** Countries’ damage should be independent of each other.
+
+### 3. Test Statistics
+
+```{r, warning = FALSE, message = FALSE}
+asia_countries_list <- c("Afghanistan", "Armenia", "Azerbaijan", "Bahrain", "Bangladesh", "Bhutan", "Brunei", "Cambodia", "China", "Cyprus", "Georgia", "India", "Indonesia", "Iran", "Iraq", "Israel", "Japan", "Jordan", "Kazakhstan", "Kuwait", "Kyrgyzstan", "Laos", "Lebanon", "Malaysia", "Maldives", "Mongolia", "Myanmar", "Nepal", "North Korea", "Oman", "Pakistan", "Palestine", "Philippines", "Qatar", "Russia", "Saudi Arabia", "Singapore", "South Korea", "Sri Lanka", "Syria", "Taiwan", "Tajikistan", "Thailand", "Timor-Leste", "Turkey", "Turkmenistan", "United Arab Emirates", "Uzbekistan", "Vietnam", "Yemen")
+
+asia_damage_data <- disaster_data %>%
+  filter(Entity %in% asia_countries_list) %>%
+  select(Entity, Year, EconDmgShare)
+
+high_damage_data <- asia_damage_data %>% filter(EconDmgShare > 0.5)
+
+sea_count <- high_damage_data %>% filter(Entity %in% sea_countries_list) %>% nrow()
+total_count <- nrow(high_damage_data)
+
+test_stat <- (sea_count - 0.5 * total_count) / sqrt(0.5 * (1 - 0.5))
+print(paste("Test statistics:", test_stat))
+```
+
+### 4. P-value
+
+```{r, warning = FALSE, message = FALSE}
+prop.test(sea_count, total_count, 0.5, alternative = "greater")
+```
+
+### 5. Conclusion
+
+Reject *H~0~*
+
+## Limitations
+
+-   Data on natural disasters is limited, with only one data point every ten years.
+-   The Natural Disaster database includes records only up to 2010.
+-   Certain countries and territories are unable to provide data.
+:::
+
+
+# Ethics Statement
+
+-   **Shared Professional Values:** The project follows the shared value of *Respect* by acknowledging and properly crediting the works of others, ensuring that their work was neither suppressed nor diminished.
+
+-   **Ethical Principles:** The project upheld the principle of *Bearing Responsibility for the Integrity of the Discipline* by ensuring transparency in methods and findings, avoiding any form of deception or misrepresentation.
+
+# Acknowledgements
+
+| Name | Type of Resource | URL/Source |
+|------------------------|------------------------|------------------------|
+| Topic 2 & 8 Extensions | Ed Lessons | <https://edstem.org/au/courses/16787/lessons/> |
+| Introduction to the viridis color maps | Documentation | <https://cran.r-project.org/web/packages/viridis/vignettes/intro-to-viridis.html> |
+| How to remove border line when using geom_sf() | Blog/Post | <https://stackoverflow.com/questions/47720329/how-can-i-remove-border-lines-when-using-geom-sf>| 
+| Grammarly | Spell/Grammar Checker | <https://app.grammarly.com> |
+| ChatGPT | Generative AI | <https://app.grammarly.com> |
+
+# References
+
+The Asian Development Bank - Synthesis Report on Ten ASEAN Countries Disaster Risks Assessment, <https://www.unisdr.org/files/18872_asean.pdf>
+
+UNDRR: Financing Disaster Risk Reduction in Asia and the Pacific: A Guide for Policy Makers, <https://dx.doi.org/10.22617/TIM200415-2>
+
+UNDRR: Disaster risk reduction progress score and Hyogo Framework for Action, <https://www.preventionweb.net/sendai-framework/Hyogo-Framework-for-Action>
